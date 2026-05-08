@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shark Hunt V12: Relentless</title>
+    <style>
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            overflow: hidden; background: linear-gradient(to bottom, #004e92, #000428);
+            font-family: 'Comic Sans MS', cursive;
+        }
+
+        #ocean {
+            position: relative; width: 100%; height: 100%;
+            cursor: none; 
+            transition: filter 1s ease;
+        }
+
+        /* The Camera Layer */
+        #camera {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            transform-origin: center center;
+            overflow: visible; 
+            will-change: transform; 
+        }
+
+        /* Ambient Bubbles */
+        .bubble {
+            position: absolute; background: rgba(255, 255, 255, 0.15);
+            border-radius: 50%; bottom: -100px; animation: rise linear infinite;
+            will-change: transform;
+        }
+        @keyframes rise {
+            0% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-500vh); opacity: 0; }
+        }
+
+        /* SHARK SEGMENT STYLING */
+        .shark-container {
+            position: absolute; left: 0; top: 0;
+            pointer-events: none; 
+        }
+
+        .segment {
+            position: absolute; background-color: #708090; 
+            border-radius: 50%; 
+            border: 1px solid rgba(0,0,0,0.1); 
+            will-change: transform;
+        }
+
+        .segment::after {
+            content: ''; position: absolute; bottom: 0; left: 10%; width: 80%; height: 40%;
+            background-color: #e0e0e0; border-radius: 50%; opacity: 0.5;
+        }
+
+        .fin-pectoral, .fin-dorsal, .fin-tail {
+            position: absolute; background-color: #5a6a7a;
+            transition: background-color 0.5s;
+        }
+        
+        .fin-pectoral {
+            top: 50%; width: 140%; height: 20%; left: -20%; border-radius: 40%; z-index: -1;
+        }
+
+        .fin-dorsal {
+            top: -50%; left: 30%; width: 30%; height: 70%; border-radius: 10px 50% 0 0; z-index: -1;
+            transform: skewY(-20deg);
+        }
+
+        .fin-tail {
+            top: 10%; right: -60%; width: 100%; height: 80%;
+            clip-path: polygon(0% 50%, 100% 0%, 80% 50%, 100% 100%);
+        }
+
+        /* Teeth Upgrade */
+        .teeth-upgrade {
+            position: absolute; right: -15px; top: -10%; width: 65%; height: 120%;
+            border-radius: 50%; border-right: 25px dashed #ffffff;
+            box-sizing: border-box; z-index: 5;
+            border-bottom: 2px solid rgba(255,255,255,0.5); 
+        }
+
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        .invulnerable { animation: blink 0.2s infinite; }
+
+        /* Blood Splatter Effect */
+        .blood-drop {
+            position: absolute; background-color: #aa0000;
+            border-radius: 50%; pointer-events: none; z-index: 50;
+            animation: splatter 0.7s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+            will-change: transform, opacity;
+        }
+
+        @keyframes splatter {
+            0% { transform: translate(0, 0) scale(1); opacity: 1; }
+            100% { transform: translate(var(--tx), var(--ty)) scale(var(--s)); opacity: 0; }
+        }
+
+        /* Edna and Speech Bubble */
+        .edna-fixed {
+            position: absolute; bottom: 0; left: 2vw; z-index: 100;
+            display: flex; flex-direction: column; align-items: center; pointer-events: none;
+        }
+        .speech-bubble {
+            background: white; border-radius: 20px; padding: 10px 20px;
+            font-size: 20px; font-weight: bold; color: black;
+            margin-bottom: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            white-space: nowrap; position: relative;
+        }
+        .speech-bubble::after {
+            content: ''; position: absolute; bottom: -15px; left: 50px;
+            border-width: 15px 15px 0 0; border-style: solid;
+            border-color: white transparent transparent transparent;
+        }
+
+        /* Hunt Overlay UI */
+        #hunt-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 150; box-shadow: inset 0 0 0vw rgba(255,0,0,0);
+            transition: box-shadow 0.5s ease-out; display: flex; justify-content: center; align-items: center;
+        }
+        #hunt-overlay.active { box-shadow: inset 0 0 15vw rgba(255, 0, 0, 0.8); }
+        #hunt-text {
+            color: #ff0000; font-size: 150px; font-weight: bold;
+            text-shadow: 0 0 30px #000, 8px 8px 0 #000;
+            opacity: 0; transform: scale(0.5); font-family: Impact, sans-serif;
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); letter-spacing: 5px;
+        }
+        #hunt-text.show {
+            opacity: 1; transform: scale(1); animation: pulseText 0.3s infinite alternate;
+        }
+        @keyframes pulseText {
+            from { transform: scale(1); }
+            to { transform: scale(1.1); text-shadow: 0 0 50px #f00, 8px 8px 0 #000; }
+        }
+
+        /* Game UI */
+        #score-container {
+            position: absolute; top: 20px; right: 30px; z-index: 100;
+            text-align: right; pointer-events: none;
+        }
+        #score-board {
+            font-size: 36px; font-weight: bold; color: white;
+            text-shadow: 2px 2px 5px rgba(0,0,0,0.8); margin-bottom: -5px;
+        }
+        #best-score-board {
+            font-size: 20px; font-weight: bold; color: gold; text-shadow: 2px 2px 5px rgba(0,0,0,0.8);
+        }
+
+        #game-over-screen {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            display: none; flex-direction: column; align-items: center; z-index: 200;
+            background: rgba(0,0,0,0.6); padding: 40px; border-radius: 20px;
+            border: 4px solid #aa0000; box-shadow: 0 0 50px rgba(170,0,0,0.5); min-width: 300px;
+        }
+
+        #game-over-title {
+            color: #ff3333; font-size: 60px; margin: 0 0 20px 0; text-shadow: 4px 4px 0 #000;
+        }
+
+        /* Highscore UI */
+        #highscore-entry { display: flex; flex-direction: column; gap: 15px; margin-bottom: 20px; width: 100%; }
+        #highscore-entry input {
+            padding: 15px; font-size: 24px; border-radius: 10px; border: none;
+            text-align: center; font-family: 'Comic Sans MS', cursive; background: rgba(255,255,255,0.9);
+        }
+        #submit-score-btn, #restart-btn {
+            padding: 15px 40px; font-size: 24px; font-family: 'Comic Sans MS', cursive;
+            font-weight: bold; border-radius: 15px; cursor: pointer;
+            transition: transform 0.2s, filter 0.2s; border: none;
+        }
+        #submit-score-btn { background-color: #004e92; color: white; border: 3px solid #fff; }
+        #restart-btn { background-color: #aa0000; color: white; border: 3px solid #fff; width: 100%; }
+        #submit-score-btn:hover, #restart-btn:hover { transform: scale(1.05); filter: brightness(1.2); }
+
+        #leaderboard {
+            display: none; width: 100%; background: rgba(0,0,0,0.5); 
+            padding: 20px; border-radius: 15px; color: white; text-align: center; 
+            margin-bottom: 20px; box-sizing: border-box;
+        }
+        #leaderboard h2 { margin-top: 0; color: gold; text-shadow: 2px 2px 0 #000; }
+        #leaderboard ul { list-style: none; padding: 0; font-size: 24px; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+        #leaderboard li { display: flex; justify-content: space-between; background: rgba(255,255,255,0.1); padding: 5px 15px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+
+    <div id="hunt-overlay"><div id="hunt-text">HUNT THEM</div></div>
+
+    <div id="ocean">
+        <div id="camera">
+            <div class="bubble" style="left: -150%; width: 25px; height: 25px; animation-duration: 9s;"></div>
+            <div class="bubble" style="left: -50%; width: 45px; height: 45px; animation-duration: 14s; animation-delay: 2s;"></div>
+            <div class="bubble" style="left: 10%; width: 20px; height: 20px; animation-duration: 8s;"></div>
+            <div class="bubble" style="left: 25%; width: 40px; height: 40px; animation-duration: 12s; animation-delay: 2s;"></div>
+            <div class="bubble" style="left: 60%; width: 15px; height: 15px; animation-duration: 7s; animation-delay: 1s;"></div>
+            <div class="bubble" style="left: 85%; width: 35px; height: 35px; animation-duration: 10s; animation-delay: 4s;"></div>
+            <div class="bubble" style="left: 140%; width: 30px; height: 30px; animation-duration: 11s; animation-delay: 1s;"></div>
+            <div class="bubble" style="left: 220%; width: 50px; height: 50px; animation-duration: 15s; animation-delay: 3s;"></div>
+        </div>
+
+        <div id="score-container">
+            <div id="score-board">Score: <span id="score">0</span></div>
+            <div id="best-score-board">Best: <span id="best-score">...</span></div>
+        </div>
+
+        <div class="edna-fixed">
+            <div id="edna-text" class="speech-bubble">Why shjarkeart other shark</div>
+            <svg viewBox="0 0 100 150" width="150" height="225">
+                <path d="M 20 150 L 40 80 L 60 80 L 80 150 Z" fill="#0033a0" />
+                <path d="M 40 80 L 50 95 L 60 80 Z" fill="#111" />
+                <circle cx="50" cy="115" r="14" fill="white" stroke="#111" stroke-width="2"/>
+                <text x="50" y="121" font-family="Arial" font-weight="900" font-size="16" fill="#0033a0" text-anchor="middle">4</text>
+                <rect x="45" y="70" width="10" height="15" fill="#fcdbb6" />
+                <circle cx="50" cy="50" r="28" fill="#fcdbb6" />
+                <circle cx="36" cy="52" r="11" fill="none" stroke="#111" stroke-width="4" />
+                <circle cx="64" cy="52" r="11" fill="none" stroke="#111" stroke-width="4" />
+                <line x1="47" y1="52" x2="53" y2="52" stroke="#111" stroke-width="4" />
+                <circle cx="36" cy="52" r="3" fill="#111" />
+                <circle cx="64" cy="52" r="3" fill="#111" />
+                <path d="M 43 70 Q 50 67 57 70" fill="none" stroke="#111" stroke-width="2" />
+                <path d="M 18 50 C 18 10, 82 10, 82 50 L 85 80 L 75 80 L 75 40 C 75 20, 25 20, 25 40 L 25 80 L 15 80 Z" fill="#a30000" />
+                <path d="M 18 35 Q 50 38 82 35 L 82 10 Q 50 -5 18 10 Z" fill="#b30000" />
+            </svg>
+        </div>
+    </div>
+
+    <div id="game-over-screen">
+        <h1 id="game-over-title">YOU DIED</h1>
+        <div id="highscore-entry">
+            <input type="text" id="player-name" placeholder="Enter your name..." maxlength="12" autocomplete="off">
+            <button id="submit-score-btn">SAVE SCORE TO CLOUD</button>
+        </div>
+        <div id="leaderboard">
+            <h2>GLOBAL TOP 5</h2>
+            <ul id="leaderboard-list"></ul>
+        </div>
+        <button id="restart-btn">HUNT AGAIN</button>
+    </div>
+
+    <script>
+        const ocean = document.getElementById('ocean');
+        const camera = document.getElementById('camera');
+        
+        let width = window.innerWidth;
+        let height = window.innerHeight;
+
+        let screenMouseX = width / 2;
+        let screenMouseY = height / 2;
+        let mouseX = width / 2;
+        let mouseY = height / 2;
+        
+        // Game State
+        let score = 0;
+        let globalBestScore = 0;
+        let isGameOver = false;
+        let cheatPunishment = false; 
+        let zoom = 1.0;
+        
+        // Power-ups and Lives
+        let gotFins = false;
+        let gotTeeth = false;
+        let nextTeethScore = 20; 
+        let playerLives = 1;
+        let invulnerableFrames = 0;
+
+        let bossDifficultyLevel = 0;
+        let bossSpawnFrames = 180; 
+
+        const FIREBASE_DB_URL = "https://realtime-database-for-shark-default-rtdb.europe-west1.firebasedatabase.app/scores.json";
+
+        window.addEventListener('resize', () => { width = window.innerWidth; height = window.innerHeight; });
+
+        ocean.addEventListener('mousemove', (e) => {
+            if (!isGameOver) { screenMouseX = e.clientX; screenMouseY = e.clientY; }
+        });
+
+        // --- ANTI-CHEAT PROTOCOL ---
+        function triggerAntiCheat() {
+            if (isGameOver || cheatPunishment) return;
+            cheatPunishment = true;
+            
+            playerLives = 0; gotFins = false; gotTeeth = false;
+            playerShark.removeTeeth(); document.getElementById('hunt-overlay').classList.remove('active');
+            playerShark.setFinColor("#5a6a7a"); invulnerableFrames = 0;
+            playerShark.container.classList.remove('invulnerable');
+            
+            if (bosses.length === 0) { spawnBoss(); spawnBoss(); }
+            
+            bosses.forEach(boss => {
+                boss.isFleeing = false;
+                boss.dynamicSpeed = 40; boss.dynamicTurn = 0.5; 
+            });
+        }
+        document.addEventListener('contextmenu', e => { e.preventDefault(); triggerAntiCheat(); });
+
+        // --- GLOBAL SCORE TRACKING ---
+        async function fetchBestScore() {
+            try {
+                const response = await fetch(FIREBASE_DB_URL);
+                const data = await response.json();
+                if (data) {
+                    let max = 0;
+                    for (let key in data) if (data[key].score > max) max = data[key].score;
+                    globalBestScore = max;
+                    document.getElementById('best-score').innerText = globalBestScore;
+                }
+            } catch (e) { document.getElementById('best-score').innerText = "?"; }
+        }
+        fetchBestScore();
+
+        async function saveHighScore(name, score) {
+            const list = document.getElementById('leaderboard-list');
+            document.getElementById('highscore-entry').style.display = 'none';
+            document.getElementById('leaderboard').style.display = 'block';
+            list.innerHTML = "<li>Uploading to cloud...</li>";
+
+            try {
+                await fetch(FIREBASE_DB_URL, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: name || "Unknown Shark", score: score })
+                });
+                displayLeaderboard();
+            } catch (error) { list.innerHTML = "<li>Error connecting to database!</li>"; }
+        }
+
+        async function displayLeaderboard() {
+            const list = document.getElementById('leaderboard-list');
+            list.innerHTML = "<li>Loading global scores...</li>";
+            try {
+                const response = await fetch(FIREBASE_DB_URL);
+                const data = await response.json();
+                let scores = [];
+                if (data) { for (let key in data) scores.push(data[key]); }
+                scores.sort((a, b) => b.score - a.score);
+                scores = scores.slice(0, 5); 
+                
+                list.innerHTML = '';
+                if (scores.length === 0) list.innerHTML = "<li>No records yet. Be the first!</li>";
+                else scores.forEach(s => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `<span>${s.name}</span> <span>${s.score} pts</span>`;
+                    list.appendChild(li);
+                });
+            } catch (error) { list.innerHTML = "<li>Could not load leaderboards.</li>"; }
+        }
+
+        document.getElementById('submit-score-btn').addEventListener('click', () => {
+            saveHighScore(document.getElementById('player-name').value.trim(), score);
+        });
+
+        // --- UPGRADE SYSTEM ---
+        function checkUpgrades() {
+            if (score > globalBestScore) {
+                globalBestScore = score; document.getElementById('best-score').innerText = globalBestScore;
+            }
+            if (score >= 10 && !gotFins) { gotFins = true; playerLives = 2; playerShark.setFinColor("#ffd700"); }
+            if (score >= nextTeethScore && !gotTeeth) {
+                gotTeeth = true; playerShark.addTeeth(); nextTeethScore += 20; 
+                document.getElementById('hunt-overlay').classList.add('active');
+                document.getElementById('hunt-text').classList.add('show');
+                setTimeout(() => { document.getElementById('hunt-text').classList.remove('show'); }, 2000);
+            }
+        }
+
+        // --- GAME VISUALS ---
+        function spawnBlood(x, y, isMega = false) {
+            const particleCount = isMega ? 25 : 10;
+            for (let i = 0; i < particleCount; i++) {
+                const drop = document.createElement('div'); drop.className = 'blood-drop';
+                const size = isMega ? (Math.random() * 30 + 15) : (Math.random() * 15 + 8);
+                drop.style.width = `${size}px`; drop.style.height = `${size}px`;
+                drop.style.left = `${x - size/2}px`; drop.style.top = `${y - size/2}px`;
+                
+                const angle = Math.random() * Math.PI * 2;
+                const distance = isMega ? (Math.random() * 400 + 100) : (Math.random() * 150 + 30);
+                
+                drop.style.setProperty('--tx', `${Math.cos(angle) * distance}px`);
+                drop.style.setProperty('--ty', `${Math.sin(angle) * distance}px`);
+                drop.style.setProperty('--s', isMega ? '6' : '3.5');
+                camera.appendChild(drop); setTimeout(() => drop.remove(), isMega ? 1200 : 700);
+            }
+        }
+
+        function scatterBodyParts(shark) {
+            shark.segments.forEach(seg => {
+                const el = seg.el;
+                const vx = (Math.random() - 0.5) * 8; const vy = (Math.random() - 0.5) * 8; 
+                const vr = (Math.random() - 0.5) * 0.3; let opacity = 1;
+                function drift() {
+                    seg.x += vx; seg.y += vy; seg.angle += vr; opacity -= 0.025; 
+                    el.style.transform = `translate(${seg.x}px, ${seg.y}px) rotate(${seg.angle}rad)`;
+                    el.style.opacity = opacity;
+                    if (opacity > 0) requestAnimationFrame(drift); else el.remove();
+                }
+                drift();
+            });
+            setTimeout(() => shark.container.remove(), 1000);
+        }
+
+        class SegmentedShark {
+            constructor(startX, startY, baseSize, numSegments, color, finColor = null) {
+                this.x = startX; this.y = startY; this.angle = Math.random() * Math.PI * 2;
+                this.wanderAngle = this.angle; this.baseSize = baseSize;
+                this.isFleeing = false; 
+                
+                this.container = document.createElement('div'); this.container.className = 'shark-container';
+                camera.appendChild(this.container); 
+
+                this.segments = [];
+                for (let i = 0; i < numSegments; i++) {
+                    const seg = document.createElement('div'); seg.className = 'segment';
+                    const scale = 1 - (i * 0.1);
+                    seg.style.width = `${baseSize * scale}px`; seg.style.height = `${baseSize * scale * 0.7}px`;
+                    seg.style.marginLeft = `${- (baseSize * scale) / 2}px`; seg.style.marginTop = `${- (baseSize * scale * 0.7) / 2}px`;
+                    if (color) seg.style.backgroundColor = color;
+                    if (i === 1) { 
+                        const pect = document.createElement('div'); pect.className = 'fin-pectoral';
+                        const dors = document.createElement('div'); dors.className = 'fin-dorsal';
+                        if (finColor) { pect.style.backgroundColor = finColor; dors.style.backgroundColor = finColor; }
+                        seg.appendChild(pect); seg.appendChild(dors);
+                    }
+                    if (i === numSegments - 1) { 
+                        const tail = document.createElement('div'); tail.className = 'fin-tail';
+                        if (finColor) tail.style.backgroundColor = finColor; seg.appendChild(tail);
+                    }
+                    this.container.appendChild(seg);
+                    this.segments.push({ el: seg, x: startX, y: startY, angle: this.angle });
+                }
+            }
+
+            setFinColor(color) {
+                this.container.querySelectorAll('.fin-pectoral, .fin-dorsal, .fin-tail').forEach(el => el.style.backgroundColor = color);
+            }
+            addTeeth() {
+                const teeth = document.createElement('div'); teeth.className = 'teeth-upgrade';
+                this.segments[0].el.appendChild(teeth);
+            }
+            removeTeeth() {
+                const teeth = this.segments[0].el.querySelector('.teeth-upgrade'); if (teeth) teeth.remove();
+            }
+
+            updateAsPlayer(targetX, targetY) {
+                if (isGameOver) return; 
+                const dx = targetX - this.x; const dy = targetY - this.y;
+                if (Math.hypot(dx, dy) > 1) this.angle = Math.atan2(dy, dx);
+                this.x = targetX; this.y = targetY;
+                this.segments[0].x = this.x; this.segments[0].y = this.y; this.segments[0].angle = this.angle;
+                this._updateBody();
+            }
+
+            updateAsPrey(playerX, playerY) {
+                const distToPlayer = Math.hypot(playerX - this.x, playerY - this.y);
+                let moveSpeed, turnSpeed;
+
+                if (distToPlayer < 250) {
+                    let angleToTarget = Math.atan2(playerY - this.y, playerX - this.x) + Math.PI;
+                    let angleDiff = angleToTarget - this.angle;
+                    while (angleDiff <= -Math.PI) angleDiff += 2 * Math.PI; while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+                    turnSpeed = 0.15; moveSpeed = Math.max(4, 15 - (distToPlayer * 0.03)); 
+                    this.angle += angleDiff * turnSpeed; this.wanderAngle = this.angle; 
+                } else {
+                    if (Math.random() < 0.02) this.wanderAngle += (Math.random() - 0.5) * 1.5; 
+                    let angleDiff = this.wanderAngle - this.angle;
+                    while (angleDiff <= -Math.PI) angleDiff += 2 * Math.PI; while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+                    turnSpeed = 0.03; moveSpeed = 2.5; this.angle += angleDiff * turnSpeed;
+                }
+                this.x += Math.cos(this.angle) * moveSpeed; this.y += Math.sin(this.angle) * moveSpeed;
+
+                const minX = width/2 - (width/2)/zoom + 30; const maxX = width/2 + (width/2)/zoom - 30;
+                const minY = height/2 - (height/2)/zoom + 30; const maxY = height/2 + (height/2)/zoom - 30;
+                if (this.x < minX) { this.x = minX; this.wanderAngle = 0; }
+                if (this.x > maxX) { this.x = maxX; this.wanderAngle = Math.PI; }
+                if (this.y < minY) { this.y = minY; this.wanderAngle = Math.PI/2; }
+                if (this.y > maxY) { this.y = maxY; this.wanderAngle = -Math.PI/2; }
+
+                this.segments[0].x = this.x; this.segments[0].y = this.y; this.segments[0].angle = this.angle;
+                this._updateBody();
+            }
+
+            updateAsBoss(playerX, playerY, speed, turnRate) {
+                let targetX, targetY;
+                
+                // NO MORE GIVING UP. THEY HUNT UNTIL DEATH OR FLEEING FROM PLAYER TEETH.
+                if (!this.isFleeing) {
+                    targetX = playerX; targetY = playerY;
+                } else {
+                    targetX = this.exitX; targetY = this.exitY;
+                    speed *= 1.4; 
+                    turnRate = 0.01; 
+                }
+
+                let angleToTarget = Math.atan2(targetY - this.y, targetX - this.x);
+                let angleDiff = angleToTarget - this.angle;
+                while (angleDiff <= -Math.PI) angleDiff += 2 * Math.PI; while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+                this.angle += angleDiff * turnRate;
+                this.x += Math.cos(this.angle) * speed; this.y += Math.sin(this.angle) * speed;
+
+                this.segments[0].x = this.x; this.segments[0].y = this.y; this.segments[0].angle = this.angle;
+                this._updateBody();
+            }
+
+            _updateBody() {
+                for (let i = 1; i < this.segments.length; i++) {
+                    const seg = this.segments[i]; const prev = this.segments[i - 1];
+                    const dx = prev.x - seg.x; const dy = prev.y - seg.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy); const spacing = this.baseSize * 0.4;
+                    seg.angle = Math.atan2(dy, dx);
+                    if (dist > spacing) {
+                        seg.x = prev.x - Math.cos(seg.angle) * spacing; seg.y = prev.y - Math.sin(seg.angle) * spacing;
+                    }
+                }
+                this.segments.forEach(seg => { seg.el.style.transform = `translate(${seg.x}px, ${seg.y}px) rotate(${seg.angle}rad)`; });
+            }
+        }
+
+        let playerShark = new SegmentedShark(width / 2, height / 2, 100, 8); 
+        let preys = []; let bosses = []; 
+
+        function spawnPrey() {
+            const minX = width/2 - (width/2)/zoom; const maxX = width/2 + (width/2)/zoom;
+            const minY = height/2 - (height/2)/zoom; const maxY = height/2 + (height/2)/zoom;
+            const edge = Math.floor(Math.random() * 4); let px, py;
+            if (edge===0) { px = minX + Math.random()*(maxX-minX); py = minY + 50; }
+            else if (edge===1) { px = maxX - 50; py = minY + Math.random()*(maxY-minY); }
+            else if (edge===2) { px = minX + Math.random()*(maxX-minX); py = maxY - 50; }
+            else { px = minX + 50; py = minY + Math.random()*(maxY-minY); }
+            preys.push(new SegmentedShark(px, py, 40 + Math.random() * 15, 6, "#a9a9a9"));
+        }
+
+        function spawnBoss() {
+            bossDifficultyLevel++; 
+            const minX = width/2 - (width/2)/zoom; const maxX = width/2 + (width/2)/zoom;
+            const minY = height/2 - (height/2)/zoom; const maxY = height/2 + (height/2)/zoom;
+            const pad = 800 / zoom; 
+
+            let startX, startY;
+            let side = Math.floor(Math.random() * 4);
+            if (side === 0) { startX = minX + Math.random() * (maxX-minX); startY = minY - pad; }
+            else if (side === 1) { startX = maxX + pad; startY = minY + Math.random() * (maxY-minY); }
+            else if (side === 2) { startX = minX + Math.random() * (maxX-minX); startY = maxY + pad;  }
+            else { startX = minX - pad; startY = minY + Math.random() * (maxY-minY);  }
+            
+            let newBoss = new SegmentedShark(startX, startY, 260, 11, "#0a0c1a", "#05060d");
+            newBoss.dynamicSpeed = Math.min(32, 5.0 + Math.pow(bossDifficultyLevel, 1.3)); 
+            newBoss.dynamicTurn = Math.min(0.12, 0.015 + (Math.pow(bossDifficultyLevel, 1.2) * 0.003));
+            newBoss.angle = Math.atan2(playerShark.y - startY, playerShark.x - startX); 
+            bosses.push(newBoss);
+        }
+
+        for (let i = 0; i < 4; i++) spawnPrey();
+
+        function gameOver() {
+            if (isGameOver) return;
+            isGameOver = true; ocean.style.filter = "grayscale(100%)"; ocean.style.cursor = "default";
+            document.getElementById('edna-text').innerText = "SHARK ATE SHARK";
+            document.getElementById('hunt-overlay').classList.remove('active');
+            document.getElementById('hunt-text').classList.remove('show');
+            document.getElementById('highscore-entry').style.display = 'flex';
+            document.getElementById('leaderboard').style.display = 'none';
+            document.getElementById('player-name').value = '';
+            document.getElementById('game-over-screen').style.display = "flex";
+            fetchBestScore();
+        }
+
+        function restartGame() {
+            isGameOver = false; cheatPunishment = false; score = 0; bossDifficultyLevel = 0;
+            zoom = 1.0; camera.style.transform = `scale(${zoom})`;
+            document.getElementById('score').innerText = score;
+            ocean.style.filter = "none"; ocean.style.cursor = "none";
+            document.getElementById('edna-text').innerText = "Why shjarkeart other shark";
+            document.getElementById('game-over-screen').style.display = "none";
+            gotFins = false; gotTeeth = false; nextTeethScore = 20; playerLives = 1; invulnerableFrames = 0;
+            document.getElementById('hunt-overlay').classList.remove('active');
+            document.getElementById('hunt-text').classList.remove('show');
+            playerShark.setFinColor("#5a6a7a"); playerShark.removeTeeth(); playerShark.container.classList.remove('invulnerable');
+            preys.forEach(p => p.container.remove()); preys = [];
+            bosses.forEach(b => b.container.remove()); bosses = [];
+            mouseX = width / 2; mouseY = height / 2; screenMouseX = width / 2; screenMouseY = height / 2;
+            playerShark.x = mouseX; playerShark.y = mouseY;
+            bossSpawnFrames = 240; for (let i = 0; i < 4; i++) spawnPrey();
+        }
+
+        document.getElementById('restart-btn').addEventListener('click', restartGame);
+
+        function animate() {
+            const time = Date.now();
+
+            if (!isGameOver) { zoom = Math.max(0.25, zoom - 0.0006); camera.style.transform = `scale(${zoom})`; }
+            mouseX = (screenMouseX - width/2) / zoom + width/2; mouseY = (screenMouseY - height/2) / zoom + height/2;
+
+            if (invulnerableFrames > 0) {
+                invulnerableFrames--; if (invulnerableFrames === 0) playerShark.container.classList.remove('invulnerable');
+            }
+
+            const wiggleX = isGameOver ? 0 : Math.cos(time * 0.003) * 12; const wiggleY = isGameOver ? 0 : Math.sin(time * 0.002) * 12;
+            playerShark.updateAsPlayer(mouseX + wiggleX, mouseY + wiggleY);
+
+            let currentPreyCap = Math.min(15, 5 + Math.floor(bossDifficultyLevel / 2));
+            let currentPreyMin = Math.max(3, currentPreyCap - 3);
+            if (preys.length < currentPreyMin) {
+                const target = Math.floor(Math.random() * (currentPreyCap - currentPreyMin + 1)) + currentPreyMin;
+                while (preys.length < target) spawnPrey();
+            }
+
+            for (let i = preys.length - 1; i >= 0; i--) {
+                let prey = preys[i];
+                if (!isGameOver) prey.updateAsPrey(playerShark.x, playerShark.y);
+                if (!isGameOver && Math.hypot(prey.x - playerShark.x, prey.y - playerShark.y) < 45) {
+                    spawnBlood(prey.x, prey.y, false); scatterBodyParts(prey); preys.splice(i, 1); 
+                    score++; document.getElementById('score').innerText = score; checkUpgrades(); 
+                }
+            }
+
+            if (!isGameOver && !cheatPunishment) {
+                bossSpawnFrames--;
+                if (bossSpawnFrames <= 0) {
+                    // CAPPED AT 50 BOSSES MAX
+                    if (bosses.length < 50) spawnBoss();
+                    bossSpawnFrames = Math.max(30, 300 * Math.pow(0.85, bossDifficultyLevel)); 
+                }
+            }
+
+            for (let i = bosses.length - 1; i >= 0; i--) {
+                let boss = bosses[i];
+                
+                if (!isGameOver) {
+                    boss.updateAsBoss(playerShark.x, playerShark.y, boss.dynamicSpeed, boss.dynamicTurn);
+                    
+                    let hitAnyPart = false;
+                    for(let j=0; j < boss.segments.length; j++) {
+                        let seg = boss.segments[j];
+                        if (Math.hypot(playerShark.x - seg.x, playerShark.y - seg.y) < 80) { hitAnyPart = true; break; }
+                    }
+
+                    let bossEatsPlayer = (!boss.isFleeing && Math.hypot(playerShark.x - boss.x, playerShark.y - boss.y) < 130);
+
+                    if (gotTeeth && !boss.isFleeing && !cheatPunishment && (hitAnyPart || bossEatsPlayer)) {
+                        spawnBlood(boss.x, boss.y, true); 
+                        score += 2; document.getElementById('score').innerText = score;
+                        gotTeeth = false; playerShark.removeTeeth(); document.getElementById('hunt-overlay').classList.remove('active');
+                        checkUpgrades(); 
+                        
+                        bosses.forEach(b => {
+                            b.isFleeing = true;
+                            let fleeAngle = Math.atan2(b.y - playerShark.y, b.x - playerShark.x);
+                            b.exitX = b.x + Math.cos(fleeAngle) * 10000; b.exitY = b.y + Math.sin(fleeAngle) * 10000;
+                        });
+                        continue; 
+                    } else if (bossEatsPlayer) {
+                        if (invulnerableFrames <= 0) {
+                            if (playerLives > 1 && !cheatPunishment) {
+                                playerLives--; gotFins = false; playerShark.setFinColor("#5a6a7a"); spawnBlood(playerShark.x, playerShark.y, false);
+                                invulnerableFrames = 90; playerShark.container.classList.add('invulnerable');
+                                boss.isFleeing = true;
+                                let fleeAngle = Math.atan2(boss.y - playerShark.y, boss.x - playerShark.x);
+                                boss.exitX = boss.x + Math.cos(fleeAngle) * 10000; boss.exitY = boss.y + Math.sin(fleeAngle) * 10000;
+                            } else {
+                                spawnBlood(playerShark.x, playerShark.y, true); gameOver();
+                            }
+                        }
+                    }
+                } else {
+                    boss.updateAsBoss(boss.x, boss.y, boss.dynamicSpeed, boss.dynamicTurn);
+                }
+
+                const pad = 400 / zoom; 
+                const minX = width/2 - (width/2)/zoom - pad;
+                const maxX = width/2 + (width/2)/zoom + pad;
+                const minY = height/2 - (height/2)/zoom - pad;
+                const maxY = height/2 + (height/2)/zoom + pad;
+
+                let isOffScreen = (boss.x < minX || boss.x > maxX || boss.y < minY || boss.y > maxY);
+
+                // STRICT CAMERA-BOUND DESPAWN ONLY WHEN FLEEING
+                if (boss.isFleeing && isOffScreen) {
+                    boss.container.remove(); 
+                    bosses.splice(i, 1);
+                }
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+    </script>
+</body>
+</html>
